@@ -6,3 +6,4 @@ allure*/
 **/venv/
 Dockerfile*
 */__pycache__/
+selenoid/

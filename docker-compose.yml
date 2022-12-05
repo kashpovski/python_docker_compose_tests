@@ -1,0 +1,108 @@
+version: "3.1"
+
+services:
+
+  phpadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpadmin
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_PORT=3306
+      - PMA_USER=bn_opencart
+    networks:
+      - test_net
+    ports:
+      - "8888:80"
+
+  mariadb:
+    image: docker.io/bitnami/mariadb:10.3
+    container_name: mariadb
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - MARIADB_USER=bn_opencart
+      - MARIADB_DATABASE=bitnami_opencart
+    networks:
+      - test_net
+    volumes:
+      - mariadb_data:/bitnami/mariadb
+    ports:
+      - "3306:3306"
+
+  opencart:
+    image: docker.io/bitnami/opencart:3
+    container_name: opencart
+    ports:
+      - "8081:8081"
+      - "443:8443"
+    environment:
+      - OPENCART_HOST=192.168.31.185:8081
+      - APACHE_HTTP_PORT_NUMBER=8081
+      - OPENCART_DATABASE_HOST=mariadb
+      - OPENCART_DATABASE_PORT_NUMBER=3306
+      - OPENCART_DATABASE_USER=bn_opencart
+      - OPENCART_DATABASE_NAME=bitnami_opencart
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - test_net
+    volumes:
+      - opencart_data:/bitnami/opencart
+      - opencart_storage_data:/bitnami/opencart_storage/
+    depends_on:
+      - mariadb
+
+  selenoid:
+      image: "aerokube/selenoid"
+      container_name: selenoid
+      networks:
+        - test_net
+      ports:
+        - "4444:4444"
+      environment:
+        - OVERRIDE_VIDEO_OUTPUT_DIR=./selenoid/video
+      volumes:
+        - ./selenoid/config/:/etc/selenoid/:ro
+        - ./selenoid/video:/opt/selenoid/video
+        - ./selenoid/logs:/opt/selenoid/logs
+        - /var/run/docker.sock:/var/run/docker.sock
+      command: ["-conf", "/etc/selenoid/browsers.json",
+                "-video-output-dir", "/opt/selenoid/video",
+                "-log-output-dir", "/opt/selenoid/logs",
+                "-container-network", "python_docker_compose_tests_test_net"]
+      depends_on:
+        - opencart
+
+  selenoid-ui:
+    image: "aerokube/selenoid-ui"
+    container_name: selenoid-ui
+    networks:
+      - test_net
+    links:
+      - selenoid
+    ports:
+      - "8082:8080"
+    command: ["--selenoid-uri", "http://selenoid:4444"]
+    depends_on:
+      - selenoid
+
+  tests:
+    container_name: tests
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh sleep.sh
+    networks:
+      - test_net
+    depends_on:
+      - selenoid
+
+networks:
+  test_net:
+
+
+volumes:
+  mariadb_data:
+    driver: local
+  opencart_data:
+    driver: local
+  opencart_storage_data:
+    driver: local

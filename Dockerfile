@@ -10,4 +10,4 @@ RUN pip install -r requirements.txt
 # из контекста в рабочий дирректорий
 COPY . .
 
-ENTRYPOINT ["pytest"]
+#ENTRYPOINT ["pytest"]
